@@ -8,7 +8,9 @@ import (
 	"github.com/hyperledger/sawtooth-sdk-go/logging"
 	"github.com/hyperledger/sawtooth-sdk-go/processor"
 	"github.com/hyperledger/sawtooth-sdk-go/protobuf/processor_pb2"
-	"github.com/vittoriocapocasale/doublesc_tp/sc2/utils"
+	"github.com/vittoriocapocasale/doublesc_tp/sc2/cbor"
+	"github.com/vittoriocapocasale/doublesc_tp/sc2/hash"
+	"github.com/vittoriocapocasale/doublesc_tp/sc2/payload"
 )
 
 const (
@@ -45,8 +47,8 @@ func (self *SC2Handler) Apply(request *processor_pb2.TpProcessRequest, context *
 	}
 	//retrive the "kind" of transaction by reading only the "action" of payload
 
-	var payload utils.GenericPayload
-	err := utils.DecodeCbor(payloadData, &payload)
+	var payload payload.GenericPayload
+	err := cbor.DecodeCbor(payloadData, &payload)
 	if err != nil {
 		return &processor.InvalidTransactionError{Msg: fmt.Sprint("Failed to decode payload: ", err)}
 	}
@@ -54,12 +56,12 @@ func (self *SC2Handler) Apply(request *processor_pb2.TpProcessRequest, context *
 	case "Reset":
 
 		buffer := new(bytes.Buffer)
-		err := utils.EncodeCbor(payload.Quantity, buffer)
+		err := cbor.EncodeCbor(payload.Quantity, buffer)
 		if err != nil {
 			return &processor.InternalError{Msg: fmt.Sprint("Failed to encode", err)}
 		}
-		hash := utils.Hexdigest(payload.Identifier)
-		address := FAMILY_PREFIX + hash[len(hash)-64:]
+		hashv := hash.Hexdigest(payload.Identifier)
+		address := FAMILY_PREFIX + hashv[len(hashv)-64:]
 		addresses, err := context.SetState(map[string][]byte{
 			address: buffer.Bytes(),
 		})
@@ -75,8 +77,8 @@ func (self *SC2Handler) Apply(request *processor_pb2.TpProcessRequest, context *
 		context.AddEvent("ADDER/adder", attributes, empty)
 		return nil
 	case "Add":
-		hash := utils.Hexdigest(payload.Identifier)
-		address := FAMILY_PREFIX + hash[len(hash)-64:]
+		hashv := hash.Hexdigest(payload.Identifier)
+		address := FAMILY_PREFIX + hashv[len(hashv)-64:]
 		results, err := context.GetState([]string{address})
 		if err != nil {
 			return &processor.InternalError{Msg: fmt.Sprint("Failed to load", err)}
@@ -84,14 +86,14 @@ func (self *SC2Handler) Apply(request *processor_pb2.TpProcessRequest, context *
 		data, exists := results[address]
 		var storedAddend uint32
 		if exists && len(data) > 0 {
-			err = utils.DecodeCbor(data, &storedAddend)
+			err = cbor.DecodeCbor(data, &storedAddend)
 			if err != nil {
 				return &processor.InternalError{Msg: fmt.Sprint("Failed to decode", err)}
 			}
 		}
 		sum := storedAddend + payload.Quantity
 		buffer := new(bytes.Buffer)
-		err = utils.EncodeCbor(&sum, buffer)
+		err = cbor.EncodeCbor(&sum, buffer)
 		if err != nil {
 			return &processor.InternalError{Msg: fmt.Sprint("Failed to encode", err)}
 		}

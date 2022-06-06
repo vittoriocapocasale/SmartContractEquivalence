@@ -60,8 +60,8 @@ func (self *SC1Handler) Apply(request *processor_pb2.TpProcessRequest, context *
 		if err != nil {
 			return &processor.InternalError{Msg: fmt.Sprint("Failed to encode", err)}
 		}
-		hash := hash.Hexdigest(payload.Identifier)
-		address := FAMILY_PREFIX + hash[len(hash)-64:]
+		hashv := hash.Hexdigest(payload.Identifier)
+		address := FAMILY_PREFIX + hashv[len(hashv)-64:]
 		addresses, err := context.SetState(map[string][]byte{
 			address: buffer.Bytes(),
 		})

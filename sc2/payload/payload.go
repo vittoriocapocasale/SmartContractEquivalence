@@ -1,4 +1,4 @@
-package utils
+package payload
 
 type GenericPayload struct {
 	Action     string
