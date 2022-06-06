@@ -1,0 +1,5 @@
+{
+    "apiEndpoint":"rest-api-0:8008",
+    "eventEndpoint":["validator-0:4004","validator-4:4004"],
+    "value":5
+}

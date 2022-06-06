@@ -1,0 +1,5 @@
+{
+    "apiEndpoint":"localhost:8000",
+    "eventEndpoint":["localhost:4000","localhost:4004"],
+    "value":5
+}

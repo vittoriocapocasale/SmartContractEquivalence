@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  client:
+    container_name: client
+    image: node:12
+    working_dir: /usr/src/client
+    command: bash -c "npm install && node main.js"
+    volumes:
+        - ./client:/usr/src/client
+        - /usr/src/client/node_modules
+        - ./client/assets/environment_container.json:/usr/src/client/assets/environment.json

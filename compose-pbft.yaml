@@ -1,0 +1,430 @@
+version: '3.6'
+
+volumes:
+  pbft-shared:
+
+services:
+
+
+  rest-api-0:
+    image: hyperledger/sawtooth-rest-api:chime
+    container_name: sawtooth-rest-api-default-0
+    expose:
+      - 8008
+    ports:
+      - 8000:8008
+    command: |
+      bash -c "
+        sawtooth-rest-api \
+          --connect tcp://validator-0:4004 \
+          --bind rest-api-0:8008
+      "
+    stop_signal: SIGKILL
+
+  rest-api-1:
+    image: hyperledger/sawtooth-rest-api:chime
+    container_name: sawtooth-rest-api-default-1
+    expose:
+      - 8008
+    ports:
+      - 8001:8008
+    command: |
+      bash -c "
+        sawtooth-rest-api \
+          --connect tcp://validator-1:4004 \
+          --bind rest-api-1:8008
+      "
+    stop_signal: SIGKILL
+
+  rest-api-2:
+    image: hyperledger/sawtooth-rest-api:chime
+    container_name: sawtooth-rest-api-default-2
+    expose:
+      - 8008
+    ports:
+      - 8002:8008
+    command: |
+      bash -c "
+        sawtooth-rest-api \
+          --connect tcp://validator-2:4004 \
+          --bind rest-api-2:8008
+      "
+    stop_signal: SIGKILL
+
+  rest-api-3:
+    image: hyperledger/sawtooth-rest-api:chime
+    container_name: sawtooth-rest-api-default-3
+    expose:
+      - 8008
+    ports:
+      - 8003:8008
+    command: |
+      bash -c "
+        sawtooth-rest-api \
+          --connect tcp://validator-3:4004 \
+          --bind rest-api-3:8008
+      "
+    stop_signal: SIGKILL
+
+  rest-api-4:
+    image: hyperledger/sawtooth-rest-api:chime
+    container_name: sawtooth-rest-api-default-4
+    expose:
+      - 8008
+    ports:
+      - 8004:8008
+    command: |
+      bash -c "
+        sawtooth-rest-api \
+          --connect tcp://validator-4:4004 \
+          --bind rest-api-4:8008
+      "
+    stop_signal: SIGKILL
+
+# -------------=== settings tp ===-------------
+
+  settings-tp-0:
+    image: hyperledger/sawtooth-settings-tp:chime
+    container_name: sawtooth-settings-tp-default-0
+    expose:
+      - 4004
+    command: settings-tp -C tcp://validator-0:4004
+    stop_signal: SIGKILL
+
+  settings-tp-1:
+    image: hyperledger/sawtooth-settings-tp:chime
+    container_name: sawtooth-settings-tp-default-1
+    expose:
+      - 4004
+    command: settings-tp -C tcp://validator-1:4004
+    stop_signal: SIGKILL
+
+  settings-tp-2:
+    image: hyperledger/sawtooth-settings-tp:chime
+    container_name: sawtooth-settings-tp-default-2
+    expose:
+      - 4004
+    command: settings-tp -C tcp://validator-2:4004
+    stop_signal: SIGKILL
+
+  settings-tp-3:
+    image: hyperledger/sawtooth-settings-tp:chime
+    container_name: sawtooth-settings-tp-default-3
+    expose:
+      - 4004
+    command: settings-tp -C tcp://validator-3:4004
+    stop_signal: SIGKILL
+
+  settings-tp-4:
+    image: hyperledger/sawtooth-settings-tp:chime
+    container_name: sawtooth-settings-tp-default-4
+    expose:
+      - 4004
+    command: settings-tp -C tcp://validator-4:4004
+    stop_signal: SIGKILL
+
+# -------------=== validators ===-------------
+
+  validator-0:
+    image: hyperledger/sawtooth-validator:1.2.3
+    container_name: sawtooth-validator-default-0
+    expose:
+      - 4004
+      - 5050
+      - 8800
+    ports:
+      - 4000:4004
+    volumes:
+      - pbft-shared:/pbft-shared
+    command: |
+      bash -c "
+        if [ -e /pbft-shared/validators/validator-0.priv ]; then
+          cp /pbft-shared/validators/validator-0.pub /etc/sawtooth/keys/validator.pub
+          cp /pbft-shared/validators/validator-0.priv /etc/sawtooth/keys/validator.priv
+        fi &&
+        if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+          sawadm keygen
+          mkdir -p /pbft-shared/validators || true
+          cp /etc/sawtooth/keys/validator.pub /pbft-shared/validators/validator-0.pub
+          cp /etc/sawtooth/keys/validator.priv /pbft-shared/validators/validator-0.priv
+        fi &&
+        if [ ! -e config-genesis.batch ]; then
+          sawset genesis -k /etc/sawtooth/keys/validator.priv -o config-genesis.batch
+        fi &&
+        while [[ ! -f /pbft-shared/validators/validator-1.pub || \
+                 ! -f /pbft-shared/validators/validator-2.pub || \
+                 ! -f /pbft-shared/validators/validator-3.pub || \
+                 ! -f /pbft-shared/validators/validator-4.pub ]];
+        do sleep 1; done
+        echo sawtooth.consensus.pbft.members=\\['\"'$$(cat /pbft-shared/validators/validator-0.pub)'\"','\"'$$(cat /pbft-shared/validators/validator-1.pub)'\"','\"'$$(cat /pbft-shared/validators/validator-2.pub)'\"','\"'$$(cat /pbft-shared/validators/validator-3.pub)'\"','\"'$$(cat /pbft-shared/validators/validator-4.pub)'\"'\\] &&
+        if [ ! -e config.batch ]; then
+         sawset proposal create \
+            -k /etc/sawtooth/keys/validator.priv \
+            sawtooth.consensus.algorithm.name=pbft \
+            sawtooth.consensus.algorithm.version=1.0 \
+            sawtooth.consensus.pbft.members=\\['\"'$$(cat /pbft-shared/validators/validator-0.pub)'\"','\"'$$(cat /pbft-shared/validators/validator-1.pub)'\"','\"'$$(cat /pbft-shared/validators/validator-2.pub)'\"','\"'$$(cat /pbft-shared/validators/validator-3.pub)'\"','\"'$$(cat /pbft-shared/validators/validator-4.pub)'\"'\\] \
+            sawtooth.publisher.max_batches_per_block=1200 \
+            -o config.batch
+        fi &&
+        if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
+          sawadm genesis config-genesis.batch config.batch
+        fi &&
+        if [ ! -e /root/.sawtooth/keys/my_key.priv ]; then
+          sawtooth keygen my_key
+        fi &&
+        sawtooth-validator -vv \
+          --endpoint tcp://validator-0:8800 \
+          --bind component:tcp://eth0:4004 \
+          --bind consensus:tcp://eth0:5050 \
+          --bind network:tcp://eth0:8800 \
+          --scheduler parallel \
+          --peering static \
+          --maximum-peer-connectivity 10000
+      "
+
+  validator-1:
+    image: hyperledger/sawtooth-validator:1.2.3
+    container_name: sawtooth-validator-default-1
+    expose:
+      - 4004
+      - 5050
+      - 8800
+    volumes:
+      - pbft-shared:/pbft-shared
+    command: |
+      bash -c "
+        if [ -e /pbft-shared/validators/validator-1.priv ]; then
+          cp /pbft-shared/validators/validator-1.pub /etc/sawtooth/keys/validator.pub
+          cp /pbft-shared/validators/validator-1.priv /etc/sawtooth/keys/validator.priv
+        fi &&
+        if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+          sawadm keygen
+          mkdir -p /pbft-shared/validators || true
+          cp /etc/sawtooth/keys/validator.pub /pbft-shared/validators/validator-1.pub
+          cp /etc/sawtooth/keys/validator.priv /pbft-shared/validators/validator-1.priv
+        fi &&
+        sawtooth keygen my_key &&
+        sawtooth-validator -vv \
+          --endpoint tcp://validator-1:8800 \
+          --bind component:tcp://eth0:4004 \
+          --bind consensus:tcp://eth0:5050 \
+          --bind network:tcp://eth0:8800 \
+          --scheduler parallel \
+          --peering static \
+          --maximum-peer-connectivity 10000 \
+          --peers tcp://validator-0:8800
+      "
+
+  validator-2:
+    image: hyperledger/sawtooth-validator:1.2.3
+    container_name: sawtooth-validator-default-2
+    expose:
+      - 4004
+      - 5050
+      - 8800
+    volumes:
+      - pbft-shared:/pbft-shared
+    command: |
+      bash -c "
+        if [ -e /pbft-shared/validators/validator-2.priv ]; then
+          cp /pbft-shared/validators/validator-2.pub /etc/sawtooth/keys/validator.pub
+          cp /pbft-shared/validators/validator-2.priv /etc/sawtooth/keys/validator.priv
+        fi &&
+        if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+          sawadm keygen
+          mkdir -p /pbft-shared/validators || true
+          cp /etc/sawtooth/keys/validator.pub /pbft-shared/validators/validator-2.pub
+          cp /etc/sawtooth/keys/validator.priv /pbft-shared/validators/validator-2.priv
+        fi &&
+        sawtooth keygen my_key &&
+        sawtooth-validator -vv \
+          --endpoint tcp://validator-2:8800 \
+          --bind component:tcp://eth0:4004 \
+          --bind consensus:tcp://eth0:5050 \
+          --bind network:tcp://eth0:8800 \
+          --scheduler parallel \
+          --peering static \
+          --maximum-peer-connectivity 10000 \
+          --peers tcp://validator-0:8800 \
+          --peers tcp://validator-1:8800
+      "
+
+  validator-3:
+    image: hyperledger/sawtooth-validator:1.2.3
+    container_name: sawtooth-validator-default-3
+    expose:
+      - 4004
+      - 5050
+      - 8800
+    volumes:
+      - pbft-shared:/pbft-shared
+    command: |
+      bash -c "
+        if [ -e /pbft-shared/validators/validator-3.priv ]; then
+         cp /pbft-shared/validators/validator-3.pub /etc/sawtooth/keys/validator.pub
+         cp /pbft-shared/validators/validator-3.priv /etc/sawtooth/keys/validator.priv
+        fi &&
+        if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+         sawadm keygen
+         mkdir -p /pbft-shared/validators || true
+         cp /etc/sawtooth/keys/validator.pub /pbft-shared/validators/validator-3.pub
+         cp /etc/sawtooth/keys/validator.priv /pbft-shared/validators/validator-3.priv
+        fi &&
+        sawtooth keygen my_key &&
+        sawtooth-validator -vv \
+          --endpoint tcp://validator-3:8800 \
+          --bind component:tcp://eth0:4004 \
+          --bind consensus:tcp://eth0:5050 \
+          --bind network:tcp://eth0:8800 \
+          --scheduler parallel \
+          --peering static \
+          --maximum-peer-connectivity 10000 \
+          --peers tcp://validator-0:8800 \
+          --peers tcp://validator-1:8800 \
+          --peers tcp://validator-2:8800
+      "
+
+  validator-4:
+    image: hyperledger/sawtooth-validator:1.2.3
+    container_name: sawtooth-validator-default-4
+    expose:
+      - 4004
+      - 5050
+      - 8800
+    ports:
+      - 4004:4004
+    volumes:
+      - pbft-shared:/pbft-shared
+    command: |
+      bash -c "
+        if [ -e /pbft-shared/validators/validator-4.priv ]; then
+          cp /pbft-shared/validators/validator-4.pub /etc/sawtooth/keys/validator.pub
+          cp /pbft-shared/validators/validator-4.priv /etc/sawtooth/keys/validator.priv
+        fi &&
+        if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+          sawadm keygen
+          mkdir -p /pbft-shared/validators || true
+          cp /etc/sawtooth/keys/validator.pub /pbft-shared/validators/validator-4.pub
+          cp /etc/sawtooth/keys/validator.priv /pbft-shared/validators/validator-4.priv
+        fi &&
+        sawtooth keygen my_key &&
+        sawtooth-validator -vv \
+          --endpoint tcp://validator-4:8800 \
+          --bind component:tcp://eth0:4004 \
+          --bind consensus:tcp://eth0:5050 \
+          --bind network:tcp://eth0:8800 \
+          --scheduler parallel \
+          --peering static \
+          --maximum-peer-connectivity 10000 \
+          --peers tcp://validator-0:8800 \
+          --peers tcp://validator-1:8800 \
+          --peers tcp://validator-2:8800 \
+          --peers tcp://validator-3:8800
+      "
+
+# -------------=== pbft engines ===-------------
+
+  pbft-0:
+    image: hyperledger/sawtooth-pbft-engine:chime
+    container_name: sawtooth-pbft-engine-default-0
+    command: pbft-engine -vv --connect tcp://validator-0:5050
+    depends_on: 
+        - validator-0
+    stop_signal: SIGKILL
+
+  pbft-1:
+    image: hyperledger/sawtooth-pbft-engine:chime
+    container_name: sawtooth-pbft-engine-default-1
+    command: pbft-engine -vv --connect tcp://validator-1:5050
+    depends_on: 
+        - validator-1
+    stop_signal: SIGKILL
+
+  pbft-2:
+    image: hyperledger/sawtooth-pbft-engine:chime
+    container_name: sawtooth-pbft-engine-default-2
+    command: pbft-engine -vv --connect tcp://validator-2:5050
+    depends_on: 
+        - validator-2
+    stop_signal: SIGKILL
+
+  pbft-3:
+    image: hyperledger/sawtooth-pbft-engine:chime
+    container_name: sawtooth-pbft-engine-default-3
+    command: pbft-engine -vv --connect tcp://validator-3:5050
+    depends_on: 
+        - validator-3
+    stop_signal: SIGKILL
+
+  pbft-4:
+    image: hyperledger/sawtooth-pbft-engine:chime
+    container_name: sawtooth-pbft-engine-default-4
+    command: pbft-engine -vv --connect tcp://validator-4:5050
+    depends_on: 
+        - validator-4
+    stop_signal: SIGKILL
+
+
+# -------------=== your tp ===-------------
+
+
+  tp-0:
+    build:
+        context: ./sc1
+        dockerfile: Dockerfile
+    container_name: tp-0
+    depends_on:
+      - validator-0
+    expose:
+      - 4004
+    command: sc1 -vv -C tcp://validator-0:4004 --worker-thread-count 8 --max-queue-size 10000   
+    stop_signal: SIGKILL
+   
+  tp-1:
+    build:
+        context: ./sc1
+        dockerfile: Dockerfile
+    container_name: tp-1
+    depends_on:
+      - validator-1
+    expose:
+      - 4004
+    command: sc1 -vv -C tcp://validator-1:4004 --worker-thread-count 8 --max-queue-size 10000   
+    stop_signal: SIGKILL
+
+  tp-2:
+    build:
+        context: ./sc2
+        dockerfile: Dockerfile
+    container_name: tp-2
+    depends_on:
+      - validator-2
+    expose:
+      - 4004
+    command: sc2 -vv -C tcp://validator-2:4004 --worker-thread-count 8 --max-queue-size 10000   
+    stop_signal: SIGKILL
+
+
+  tp-3:
+    build:
+        context: ./sc2
+        dockerfile: Dockerfile
+    container_name: tp-3
+    depends_on:
+      - validator-3
+    expose:
+      - 4004
+    command: sc2 -vv -C tcp://validator-3:4004 --worker-thread-count 8 --max-queue-size 10000   
+    stop_signal: SIGKILL
+
+  tp-4:
+    build:
+        context: ./sc2
+        dockerfile: Dockerfile
+    container_name: tp-4
+    depends_on:
+      - validator-4
+    expose:
+      - 4004
+    command: sc2 -vv -C tcp://validator-4:4004 --worker-thread-count 8 --max-queue-size 10000  
+    stop_signal: SIGKILL
